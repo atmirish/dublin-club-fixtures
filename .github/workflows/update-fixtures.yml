@@ -1,0 +1,43 @@
+name: Update fixtures
+
+# Builds the site with this week's fixtures and publishes it to GitHub Pages.
+# Settings > Pages > Source must be set to "GitHub Actions".
+on:
+  schedule:
+    # Every 2 hours from 07:07 to 21:07 UTC (08:07–22:07 Irish summer time)
+    - cron: '7 7-21/2 * * *'
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build site
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          node scripts/fetch-fixtures.mjs _site/fixtures.json
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
