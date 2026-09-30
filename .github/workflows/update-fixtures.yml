@@ -4,9 +4,10 @@ name: Update fixtures
 # Settings > Pages > Source must be set to "GitHub Actions".
 on:
   schedule:
-    # Every 4 hours: 03:07, 07:07, 11:07, 15:07, 19:07, 23:07 UTC
-    # (04:07, 08:07, 12:07, 16:07, 20:07, 00:07 Irish summer time; an hour earlier in winter)
-    - cron: '7 3-23/4 * * *'
+    # Target: 08:00, 12:00, 16:00 and 20:00 Irish time. GitHub schedules run in UTC,
+    # so this fires at both possible UTC hours and the "check" job skips the one
+    # that doesn't match the current Irish time (summer or winter).
+    - cron: '7 7,8,11,12,15,16,19,20 * * *'
   push:
     branches: [main]
   workflow_dispatch: {}
@@ -21,7 +22,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.hour.outputs.run }}
+    steps:
+      - id: hour
+        run: |
+          h=$(TZ=Europe/Dublin date +%H)
+          echo "Irish time hour: $h"
+          if [ "${{ github.event_name }}" != "schedule" ]; then echo "run=true" >> "$GITHUB_OUTPUT"
+          else case "$h" in 08|12|16|20) echo "run=true" >> "$GITHUB_OUTPUT";; *) echo "run=false" >> "$GITHUB_OUTPUT";; esac; fi
+
   deploy:
+    needs: check
+    if: needs.check.outputs.run == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
