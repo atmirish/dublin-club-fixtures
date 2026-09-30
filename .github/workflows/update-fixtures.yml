@@ -4,8 +4,9 @@ name: Update fixtures
 # Settings > Pages > Source must be set to "GitHub Actions".
 on:
   schedule:
-    # Every 2 hours from 07:07 to 21:07 UTC (08:07–22:07 Irish summer time)
-    - cron: '7 7-21/2 * * *'
+    # Every 4 hours: 03:07, 07:07, 11:07, 15:07, 19:07, 23:07 UTC
+    # (04:07, 08:07, 12:07, 16:07, 20:07, 00:07 Irish summer time; an hour earlier in winter)
+    - cron: '7 3-23/4 * * *'
   push:
     branches: [main]
   workflow_dispatch: {}
