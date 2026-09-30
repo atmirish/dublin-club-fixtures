@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en-IE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="This week's fixtures for any Dublin GAA, camogie or ladies football club.">
+<meta name="theme-color" content="#0f2a1f">
+<title>Dublin Club Fixtures</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: pitch-green header with the club picker, then a day-by-day rail of fixture cards for one club and one week. */
+:root{
+  --bg:#eef1ee;--card:#ffffff;--ink:#17201b;--ink2:#4f5b54;--ink3:#86918a;--line:#d6ddd8;
+  --pitch:#0f2a1f;--pitch-ink:#f4f7f5;--pitch-soft:#b9d2c4;--chalk:rgba(255,255,255,.55);
+  --accent:#e2b422;--accent-ink:#8a6400;--accent-soft:#fbf0cc;--on-accent:#1f1800;
+  --camogie:#7a3fb0;--football:#1f7a4d;--ladies:#c2185b;--hurling:#2b5fb3;--other:#6b7280;--warn:#b3261e;
+  --display:'Barlow Condensed','Arial Narrow',Arial,sans-serif;--body:Barlow,'Segoe UI',Roboto,Arial,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111613;--card:#1b221e;--ink:#edf1ee;--ink2:#b2bdb6;--ink3:#7c8881;--line:#2e3833;--pitch:#0a1c14;--accent-ink:#f0c94f;--accent-soft:#3a3113;--camogie:#b17ee0;--football:#4fb582;--ladies:#ec6a9a;--hurling:#6f9be6;--other:#9aa3ad;--warn:#f08a80;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#111613;--card:#1b221e;--ink:#edf1ee;--ink2:#b2bdb6;--ink3:#7c8881;--line:#2e3833;--pitch:#0a1c14;--accent-ink:#f0c94f;--accent-soft:#3a3113;--camogie:#b17ee0;--football:#4fb582;--ladies:#ec6a9a;--hurling:#6f9be6;--other:#9aa3ad;--warn:#f08a80;color-scheme:dark}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 var(--body);-webkit-font-smoothing:antialiased}
+header{background:var(--pitch);color:var(--pitch-ink);position:relative;overflow:hidden}
+/* chalk lines: the 13m, 20m and 45m marks of a GAA pitch */
+header::before{content:"";position:absolute;inset:0;background:
+  linear-gradient(90deg,transparent calc(62% - 1px),var(--chalk) calc(62% - 1px),var(--chalk) 62%,transparent 62%),
+  linear-gradient(90deg,transparent calc(78% - 1px),var(--chalk) calc(78% - 1px),var(--chalk) 78%,transparent 78%),
+  linear-gradient(90deg,transparent calc(90% - 1px),var(--chalk) calc(90% - 1px),var(--chalk) 90%,transparent 90%);opacity:.35;pointer-events:none}
+.hwrap{position:relative;max-width:760px;margin:0 auto;padding:22px 16px 20px;display:grid;gap:14px}
+h1{font:800 clamp(34px,8vw,50px)/.9 var(--display);margin:0;letter-spacing:.01em;text-wrap:balance}
+.sub{font:600 15px/1.3 var(--body);color:var(--pitch-soft);margin:6px 0 0}
+.pick{display:grid;gap:6px;max-width:440px}
+.pick label{font:700 12px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--pitch-soft)}
+select{appearance:none;-webkit-appearance:none;width:100%;font:700 18px var(--body);color:var(--ink);background:var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%2386918a' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 14px center;border:2px solid var(--accent);border-radius:10px;padding:11px 40px 11px 14px}
+select:disabled{opacity:.7}
+select:focus-visible{outline:3px solid var(--pitch-soft);outline-offset:2px}
+main{max-width:760px;margin:0 auto;padding:14px 16px 40px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 12px}
+.chip{border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 13px;font:600 14px var(--body);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--card)}
+.chip:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.sep{width:1px;align-self:stretch;background:var(--line);margin:0 2px}
+.status{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13.5px;color:var(--ink2);margin-bottom:10px}
+.status button{border:0;background:var(--accent);color:var(--on-accent);font:700 14px var(--body);border-radius:8px;padding:7px 12px;cursor:pointer}
+.status button:disabled{opacity:.6;cursor:default}
+.err{color:var(--warn);font-weight:600}
+.summary{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin:6px 0 4px}
+.summary .club{font:800 28px/1 var(--display);letter-spacing:.01em}
+.summary .nums{font-size:14px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.day{display:grid;grid-template-columns:64px minmax(0,1fr);gap:0 12px;margin-top:18px}
+.dlabel{position:sticky;top:calc(env(safe-area-inset-top,0px) + 8px);align-self:start;text-align:center;padding-top:4px}
+.dlabel .dn{font:800 44px/.9 var(--display);display:block;font-variant-numeric:tabular-nums}
+.dlabel .dw{font:700 14px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--accent-ink);display:block}
+.dlabel .dm{font:600 12px var(--body);color:var(--ink3)}
+.dlabel.today .dn{color:var(--accent-ink)}
+.list{display:grid;gap:8px;min-width:0}
+.fx{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--sc,var(--other));border-radius:10px;padding:10px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px}
+.fx .opp{font:700 17px/1.25 var(--body);overflow-wrap:anywhere}
+.ha{font:700 11px var(--body);letter-spacing:.04em;text-transform:uppercase;border-radius:5px;padding:2px 6px;margin-right:6px;vertical-align:2px}
+.ha.home{background:var(--accent);color:var(--on-accent)}.ha.away{background:var(--ink);color:var(--card)}
+.fx .when{font:800 21px/1 var(--display);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.fx .when.tbc{font:600 13px var(--body);color:var(--ink3)}
+.fx .meta{grid-column:1/-1;font-size:13.5px;color:var(--ink2);overflow-wrap:anywhere}
+.fx .meta b{color:var(--sc,var(--ink));font-weight:700}
+.grade{font:800 13px var(--display);letter-spacing:.03em;background:var(--accent-soft);color:var(--accent-ink);border-radius:5px;padding:1px 6px;margin-right:6px}
+.fx .res{grid-column:1/-1;font:700 14px var(--body);font-variant-numeric:tabular-nums}
+.fx.pp{opacity:.7}.ppn{color:var(--warn);font-weight:700}
+.empty{background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:22px;text-align:center;color:var(--ink2);margin-top:12px}
+.empty strong{display:block;font:800 22px var(--display);color:var(--ink);margin-bottom:4px}
+.foot{margin-top:28px;font-size:12.5px;color:var(--ink3);max-width:65ch}
+@media (max-width:420px){.day{grid-template-columns:48px minmax(0,1fr);gap:0 8px}.dlabel .dn{font-size:36px}}
+@media (prefers-reduced-motion:no-preference){.fx{animation:in .25s ease-out both}@keyframes in{from{opacity:.4;transform:translateY(4px)}}}
+</style>
+</head>
+<body>
+<header><div class="hwrap">
+  <div><h1>Dublin Club Fixtures</h1><p class="sub" id="range">This week's games for any Dublin club</p></div>
+  <div class="pick"><label for="club">Your club</label>
+    <select id="club" disabled><option value="">Loading clubs…</option></select></div>
+</div></header>
+<main>
+  <div class="status" id="status">Loading fixtures…</div>
+  <div id="summary"></div>
+  <div class="bar" id="filters" role="group" aria-label="Filter fixtures"></div>
+  <div id="days"></div>
+  <p class="foot">Camogie, ladies football, and football and hurling from juvenile to adult, taken from the Dublin fixtures feeds behind dublingaa.ie (SportsManager) and updated every two hours. This page is unofficial and isn't run by Dublin GAA or SportLoMo, so check your club's noticeboard if something looks off.</p>
+</main>
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parseD=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const lsGet=k=>{try{return localStorage.getItem(k)}catch(_){return null}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(_){}};
+
+// Club names differ between the camogie, LGFA and GAA boards; fold the known variants together.
+const ALIAS={'round towers (c)':'round towers clondalkin','round towers (l)':'round towers lusk','st finians (n)':'st finians newcastle','st finians (s)':'st finians swords',
+  'st patricks (d)':'st patricks donabate','st patricks (p)':'st patricks palmerstown','craobh chiaran':'craobh chiarain','geraldine p moran':'geraldine p morans','kevins hc':'kevins',
+  'st oliver plunkett er':'st oliver plunketts er','templeogue synge st':'templeogue synge street','st pats donabate':'st patricks donabate'};
+const ckey=s=>{const k=String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[’'`.]/g,'').replace(/[\/&,]/g,' ').replace(/\s+/g,' ').trim();return ALIAS[k]||k};
+const slug=k=>k.replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+const titleCase=k=>k.replace(/\b\w/g,c=>c.toUpperCase());
+
+const state={data:null,fx:[],club:lsGet('club')||'',sport:'all',grade:'all',err:'',loading:true};
+
+function expand(rows,comps){return rows.map(r=>({id:r[0],date:r[1],time:r[2],sport:r[3],grade:r[4],comp:comps[r[5]]||'',home:r[6],away:r[7],hc:r[8]||r[6],ac:r[9]||r[7],venue:r[10],status:r[11],hs:r[12],as:r[13],hk:ckey(r[8]||r[6]),ak:ckey(r[9]||r[7])}))}
+function clubIndex(){
+  const seen=new Map();
+  state.fx.forEach(x=>[[x.hk,x.hc],[x.ak,x.ac]].forEach(([k,n])=>{if(!k)return;if(!seen.has(k))seen.set(k,new Map());const m=seen.get(k);m.set(n,(m.get(n)||0)+1)}));
+  const out=[];seen.forEach((m,k)=>{const best=[...m.entries()].sort((a,b)=>(/\(/.test(a[0])-/\(/.test(b[0]))||b[1]-a[1]||b[0].length-a[0].length)[0][0];out.push({key:k,name:/\(/.test(best)?titleCase(k):best})});
+  return out.sort((a,b)=>a.name.localeCompare(b.name,'en-IE'));
+}
+const score=s=>{const m=/^\s*(\d+)\s*[;:-]\s*(\d+)\s*$/.exec(s||'');return m?`${m[1]}-${pad(m[2])}`:''};
+const teamSuffix=(team,club)=>{const t=String(team||''),c=String(club||'');return c&&t.toLowerCase().startsWith(c.toLowerCase())?t.slice(c.length).trim():''};
+function sportColor(s){return /camog/i.test(s)?'var(--camogie)':/ladies|lgfa/i.test(s)?'var(--ladies)':/hurl/i.test(s)?'var(--hurling)':/football/i.test(s)?'var(--football)':'var(--other)'}
+function gradeKey(g){const m=/U(\d+)/.exec(g);return m?Number(m[1]):/minor/i.test(g)?18:/junior|intermediate|senior|adult/i.test(g)?30:99}
+
+function renderClubs(clubs){
+  const sel=$('#club'),want=state.club;
+  if(!clubs.length){sel.innerHTML=`<option value="">${state.loading?'Loading clubs…':'No clubs this week'}</option>`;sel.disabled=true;return}
+  const opts=['<option value="">Choose a club…</option>'].concat(clubs.map(c=>`<option value="${esc(c.key)}"${c.key===want?' selected':''}>${esc(c.name)}</option>`));
+  if(want&&!clubs.some(c=>c.key===want))opts.push(`<option value="${esc(want)}" selected>${esc(titleCase(want))}</option>`);
+  const html=opts.join('');if(sel.dataset.h!==html){sel.innerHTML=html;sel.dataset.h=html}
+  sel.disabled=false;
+}
+
+function render(){
+  const d=state.data,clubs=clubIndex(),td=ymd(new Date());
+  const h=(location.hash||'').slice(1);if(h&&clubs.length){const m=clubs.find(c=>slug(c.key)===h);if(m&&m.key!==state.club){state.club=m.key;lsSet('club',m.key)}}
+  renderClubs(clubs);
+  const up=d&&d.updatedAt?new Date(d.updatedAt):null;
+  $('#status').innerHTML=state.err?`<span class="err">${esc(state.err)}</span>`:up?`Updated ${up.toLocaleDateString('en-IE',{weekday:'short',day:'numeric',month:'short'})} at ${up.toLocaleTimeString('en-IE',{hour:'2-digit',minute:'2-digit'})}`:'Loading fixtures…';
+  if(d){const f=parseD(d.from),t=parseD(d.to);$('#range').textContent=`Monday ${f.toLocaleDateString('en-IE',{day:'numeric',month:'short'})} to Sunday ${t.toLocaleDateString('en-IE',{day:'numeric',month:'short'})}`}
+
+  const club=state.club,cinfo=clubs.find(c=>c.key===club),cname=cinfo?cinfo.name:titleCase(club||'');
+  const mine=club?state.fx.filter(x=>x.hk===club||x.ak===club):[];
+  const sports=[...new Set(mine.map(x=>x.sport))].sort(),grades=[...new Set(mine.map(x=>x.grade).filter(Boolean))].sort((a,b)=>gradeKey(a)-gradeKey(b));
+  if(state.sport!=='all'&&!sports.includes(state.sport))state.sport='all';
+  if(state.grade!=='all'&&!grades.includes(state.grade))state.grade='all';
+  const chip=(k,v,l,on)=>`<button class="chip" data-${k}="${esc(v)}" aria-pressed="${on}">${esc(l)}</button>`;
+  $('#filters').innerHTML=mine.length>1&&(sports.length>1||grades.length>1)?(chip('sport','all','All codes',state.sport==='all')+(sports.length>1?sports.map(s=>chip('sport',s,s,state.sport===s)).join(''):'')+
+    (grades.length>1?'<span class="sep"></span>'+chip('grade','all','All ages',state.grade==='all')+grades.map(g=>chip('grade',g,g,state.grade===g)).join(''):'')):'';
+  const home=mine.filter(x=>x.hk===club).length;
+  $('#summary').innerHTML=club&&mine.length?`<div class="summary"><span class="club">${esc(cname)}</span><span class="nums">${mine.length} game${mine.length===1?'':'s'} · ${home} home · ${mine.length-home} away</span></div>`:'';
+
+  const shown=mine.filter(x=>(state.sport==='all'||x.sport===state.sport)&&(state.grade==='all'||x.grade===state.grade));
+  const byDay=new Map();shown.forEach(x=>{if(!byDay.has(x.date))byDay.set(x.date,[]);byDay.get(x.date).push(x)});
+  const days=[...byDay.keys()].sort();
+  let empty='';
+  if(state.loading)empty='<strong>Loading fixtures</strong>Getting this week’s games for every Dublin club.';
+  else if(!d)empty='<strong>Fixtures aren’t available right now</strong>Try again in a few minutes.';
+  else if(!club)empty=`<strong>Choose your club</strong>${state.fx.length} games across ${clubs.length} clubs this week.`;
+  else if(!mine.length)empty=`<strong>No games for ${esc(cname)}</strong>There are no ${esc(cname)} fixtures in the feed for this week.`;
+  else if(!shown.length)empty='<strong>Nothing matches</strong>No games match these filters.';
+  $('#days').innerHTML=empty?`<div class="empty">${empty}</div>`:days.map(dd=>{const dt=parseD(dd),list=byDay.get(dd).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99')||gradeKey(a.grade)-gradeKey(b.grade));
+    return `<section class="day" aria-label="${esc(dt.toLocaleDateString('en-IE',{weekday:'long',day:'numeric',month:'long'}))}"><div class="dlabel${dd===td?' today':''}"><span class="dw">${dd===td?'Today':esc(dt.toLocaleDateString('en-IE',{weekday:'short'}))}</span><span class="dn">${dt.getDate()}</span><span class="dm">${esc(dt.toLocaleDateString('en-IE',{month:'short'}))}</span></div>
+      <div class="list">${list.map(x=>{const isHome=x.hk===club,us=isHome?x.home:x.away,them=isHome?x.away:x.home,usClub=isHome?x.hc:x.ac,team=teamSuffix(us,usClub);
+        const a=score(isHome?x.hs:x.as),b=score(isHome?x.as:x.hs),pp=x.status==='Postponed';
+        return `<article class="fx${pp?' pp':''}" style="--sc:${sportColor(x.sport)}">
+        <div class="opp"><span class="ha ${isHome?'home':'away'}">${isHome?'Home':'Away'}</span>v ${esc(them)}</div>
+        <div class="when${x.time?'':' tbc'}">${x.time?esc(x.time):'Time TBC'}</div>
+        <div class="meta">${x.grade?`<span class="grade">${esc(x.grade)}</span>`:''}<b>${esc(x.sport)}</b>${team?` · ${esc(cname)} ${esc(team)}`:''}${x.venue?` · ${esc(x.venue)}`:''}</div>
+        <div class="meta">${esc(x.comp)}${pp?' · <span class="ppn">Postponed</span>':''}</div>
+        ${a&&b&&!pp?`<div class="res">Result: ${esc(cname)} ${a} · ${esc(them)} ${b}</div>`:''}</article>`}).join('')}</div></section>`}).join('');
+}
+
+async function load(){
+  try{
+    const r=await fetch('fixtures.json',{cache:'no-cache'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    state.data=d;state.fx=expand(d.fx||[],d.comps||[]);state.err='';
+  }catch(_){state.err='Couldn’t load the fixtures. Check your connection and reload the page.'}
+  state.loading=false;render();
+}
+
+$('#club').addEventListener('change',e=>{state.club=e.target.value;lsSet('club',state.club);state.sport='all';state.grade='all';
+  try{history.replaceState(null,'',state.club?'#'+slug(state.club):location.pathname+location.search)}catch(_){}render()});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-sport],[data-grade]');if(!b)return;
+  if(b.dataset.sport!==undefined)state.sport=b.dataset.sport;else state.grade=b.dataset.grade;render()});
+window.addEventListener('hashchange',render);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.data&&Date.now()-new Date(state.data.updatedAt).getTime()>30*60*1000)load()});
+render();load();
+})();
+</script>
+</body>
+</html>
