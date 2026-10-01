@@ -98,14 +98,15 @@ const ckey=s=>{const k=String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toL
 const slug=k=>k.replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 const titleCase=k=>k.replace(/\b\w/g,c=>c.toUpperCase());
 
-const state={data:null,fx:[],club:lsGet('club')||'',sport:'all',grade:'all',err:'',loading:true};
+const ONLY='ballinteer st johns';
+const state={data:null,fx:[],club:ONLY,sport:'all',grade:'all',err:'',loading:true};
 
 function expand(rows,comps){return rows.map(r=>({id:r[0],date:r[1],time:r[2],sport:r[3],grade:r[4],comp:comps[r[5]]||'',home:r[6],away:r[7],hc:r[8]||r[6],ac:r[9]||r[7],venue:r[10],status:r[11],hs:r[12],as:r[13],hk:ckey(r[8]||r[6]),ak:ckey(r[9]||r[7])}))}
 function clubIndex(){
   const seen=new Map();
   state.fx.forEach(x=>[[x.hk,x.hc],[x.ak,x.ac]].forEach(([k,n])=>{if(!k)return;if(!seen.has(k))seen.set(k,new Map());const m=seen.get(k);m.set(n,(m.get(n)||0)+1)}));
   const out=[];seen.forEach((m,k)=>{const best=[...m.entries()].sort((a,b)=>(/\(/.test(a[0])-/\(/.test(b[0]))||b[1]-a[1]||b[0].length-a[0].length)[0][0];out.push({key:k,name:/\(/.test(best)?titleCase(k):best})});
-  return out.sort((a,b)=>a.name.localeCompare(b.name,'en-IE'));
+  return out.filter(c=>c.key===ONLY);
 }
 const score=s=>{const m=/^\s*(\d+)\s*[;:-]\s*(\d+)\s*$/.exec(s||'');return m?`${m[1]}-${pad(m[2])}`:''};
 const teamSuffix=(team,club)=>{const t=String(team||''),c=String(club||'');return c&&t.toLowerCase().startsWith(c.toLowerCase())?t.slice(c.length).trim():''};
@@ -114,8 +115,8 @@ function gradeKey(g){const m=/U(\d+)/.exec(g);return m?Number(m[1]):/minor/i.tes
 
 function renderClubs(clubs){
   const sel=$('#club'),want=state.club;
-  if(!clubs.length){sel.innerHTML=`<option value="">${state.loading?'Loading clubs…':'No clubs this week'}</option>`;sel.disabled=true;return}
-  const opts=['<option value="">Choose a club…</option>'].concat(clubs.map(c=>`<option value="${esc(c.key)}"${c.key===want?' selected':''}>${esc(c.name)}</option>`));
+  if(!clubs.length){if(state.loading){sel.innerHTML='<option value="">Loading clubs…</option>';sel.disabled=true;return}clubs=[{key:ONLY,name:'Ballinteer St Johns'}]}
+  const opts=[].concat(clubs.map(c=>`<option value="${esc(c.key)}"${c.key===want?' selected':''}>${esc(c.name)}</option>`));
   if(want&&!clubs.some(c=>c.key===want))opts.push(`<option value="${esc(want)}" selected>${esc(titleCase(want))}</option>`);
   const html=opts.join('');if(sel.dataset.h!==html){sel.innerHTML=html;sel.dataset.h=html}
   sel.disabled=false;
