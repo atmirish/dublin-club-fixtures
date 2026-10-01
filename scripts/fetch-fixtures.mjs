@@ -67,6 +67,7 @@ const { from, to } = currentWeek();
 const fx = [], seen = new Set(), feeds = [], comps = [], compIdx = new Map();
 const ci = c => { if (!compIdx.has(c)) { compIdx.set(c, comps.length); comps.push(c); } return compIdx.get(c); };
 const isBye = t => /^bye\b/i.test(t);
+const BSJ = /ballinteer/i; // only keep Ballinteer St Johns games
 
 for (const feed of FEEDS) {
   let arr;
@@ -78,6 +79,7 @@ for (const feed of FEEDS) {
     if (seen.has(k)) continue; seen.add(k);
     const home = clean(f.homeTeam || f.home), away = clean(f.awayTeam || f.away);
     if (isBye(home) || isBye(away)) continue;
+    if (!BSJ.test([f.homeClub, f.awayClub, home, away].join(' '))) continue;
     const [day, time] = when(f);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day < from || day > to) continue;
     const pp = f.postponed && String(f.postponed) !== '0';
