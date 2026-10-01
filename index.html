@@ -171,7 +171,9 @@ async function load(){
   state.loading=false;render();
 }
 
-$('#club').addEventListener('change',e=>{state.club=e.target.value;lsSet('club',state.club);state.sport='all';state.grade='all';
+$('#club').addEventListener('change',e=>{state.club=e.target.value;lsSet('club',state.club);
+  if(state.club&&window.goatcounter&&window.goatcounter.count){const ci=clubIndex().find(x=>x.key===state.club);try{window.goatcounter.count({path:'club/'+slug(state.club),title:ci?ci.name:state.club,event:true})}catch(_){}}
+  state.sport='all';state.grade='all';
   try{history.replaceState(null,'',state.club?'#'+slug(state.club):location.pathname+location.search)}catch(_){}render()});
 document.addEventListener('click',e=>{const b=e.target.closest('[data-sport],[data-grade]');if(!b)return;
   if(b.dataset.sport!==undefined)state.sport=b.dataset.sport;else state.grade=b.dataset.grade;render()});
@@ -180,5 +182,6 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 render();load();
 })();
 </script>
+<script data-goatcounter="https://atmirish.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </body>
 </html>
