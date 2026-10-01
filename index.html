@@ -58,8 +58,8 @@ main{max-width:760px;margin:0 auto;padding:14px 16px 40px}
 .fx .meta{grid-column:1/-1;font-size:13.5px;color:var(--ink2);overflow-wrap:anywhere}
 .fx .meta b{color:var(--sc,var(--ink));font-weight:700}
 .grade{font:800 13px var(--display);letter-spacing:.03em;background:var(--accent-soft);color:var(--accent-ink);border-radius:5px;padding:1px 6px;margin-right:6px}
-.fx .res{grid-column:1/-1;font:700 14px var(--body);font-variant-numeric:tabular-nums}
-.won{color:var(--win);font-weight:800;margin-left:6px}
+.fx .res{grid-column:1/-1;font:500 14px var(--body);color:var(--ink2);font-variant-numeric:tabular-nums}
+.res .w{font-weight:800;color:var(--ink)}.res .w.us{color:var(--win)}
 .fx.pp{opacity:.7}.ppn{color:var(--warn);font-weight:700}
 .empty{background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:22px;text-align:center;color:var(--ink2);margin-top:12px}
 .empty strong{display:block;font:800 22px var(--display);color:var(--ink);margin-bottom:4px}
@@ -161,7 +161,7 @@ function render(){
         <div class="when${x.time?'':' tbc'}">${x.time?esc(x.time):'Time TBC'}</div>
         <div class="meta">${x.grade?`<span class="grade">${esc(x.grade)}</span>`:''}<b>${esc(x.sport)}</b>${team?` · ${esc(cname)} ${esc(team)}`:''}${x.venue?` · ${esc(x.venue)}`:''}</div>
         <div class="meta">${esc(x.comp)}${pp?' · <span class="ppn">Postponed</span>':''}</div>
-        ${a&&b&&!pp?`<div class="res">Result: ${esc(cname)} ${a} · ${esc(them)} ${b}${pts(isHome?x.hs:x.as)>pts(isHome?x.as:x.hs)?' <span class="won">BSJ Won</span>':''}</div>`:''}</article>`}).join('')}</div></section>`}).join('');
+        ${a&&b&&!pp?(()=>{const pu=pts(isHome?x.hs:x.as),pt=pts(isHome?x.as:x.hs);return `<div class="res">Result: <span class="${pu>pt?'w us':pu===pt?'w':''}">${esc(cname)} ${a}</span> · <span class="${pt>=pu?'w':''}">${esc(them)} ${b}</span></div>`})():''}</article>`}).join('')}</div></section>`}).join('');
 }
 
 async function load(){
