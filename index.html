@@ -59,7 +59,15 @@ main{max-width:760px;margin:0 auto;padding:14px 16px 40px}
 .fx .meta b{color:var(--sc,var(--ink));font-weight:700}
 .grade{font:800 13px var(--display);letter-spacing:.03em;background:var(--accent-soft);color:var(--accent-ink);border-radius:5px;padding:1px 6px;margin-right:6px}
 .fx .res{grid-column:1/-1;font:500 14px var(--body);color:var(--ink2);font-variant-numeric:tabular-nums}
-.res .w{font-weight:800;color:var(--ink)}.res .w.us{color:var(--win)}
+.res .w,.rline .w{font-weight:800;color:var(--ink)}.res .w.us,.rline .w.us{color:var(--win)}
+.results{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px 6px;margin:2px 0 6px}
+.rhead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 12px;margin-bottom:2px}
+.rhead h2{font:800 20px/1.1 var(--display);letter-spacing:.04em;text-transform:uppercase;margin:0}
+.tally{font-size:13.5px;color:var(--ink2);font-variant-numeric:tabular-nums}.tally b{color:var(--ink)}.tally .tw{color:var(--win)}
+.rlist{list-style:none;margin:0;padding:0}
+.rlist li{padding:7px 0;border-top:1px solid var(--line);min-width:0}.rlist li:first-child{border-top:0}
+.rmeta{font-size:12.5px;color:var(--ink3)}
+.rline{font:500 14.5px/1.35 var(--body);color:var(--ink2);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .fx.pp{opacity:.7}.ppn{color:var(--warn);font-weight:700}
 .empty{background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:22px;text-align:center;color:var(--ink2);margin-top:12px}
 .empty strong{display:block;font:800 22px var(--display);color:var(--ink);margin-bottom:4px}
@@ -78,6 +86,7 @@ main{max-width:760px;margin:0 auto;padding:14px 16px 40px}
   <div class="status" id="status">Loading fixtures…</div>
   <div id="summary"></div>
   <div class="bar" id="filters" role="group" aria-label="Filter fixtures"></div>
+  <div id="results"></div>
   <div id="days"></div>
   <p class="foot">Fixtures for camogie, ladies football, and football and hurling, from juvenile to adult, are pulled from the public Dublin fixture feeds behind dublingaa.ie (SportsManager). The data updates four times a day, at 8am, 12 noon, 4pm and 8pm. This page is unofficial and isn’t run by Dublin GAA or SportLoMo, so check your club’s noticeboard if something looks off.</p>
 </main>
@@ -144,6 +153,10 @@ function render(){
   $('#summary').innerHTML=club&&mine.length?`<div class="summary"><span class="club">${esc(cname)}</span><span class="nums">${mine.length} game${mine.length===1?'':'s'} · ${home} home · ${mine.length-home} away</span></div>`:'';
 
   const shown=mine.filter(x=>(state.sport==='all'||x.sport===state.sport)&&(state.grade==='all'||x.grade===state.grade));
+  {const done=shown.filter(x=>x.status!=='Postponed'&&score(x.hs)&&score(x.as)).sort((p,q)=>(p.date+(p.time||'')).localeCompare(q.date+(q.time||'')));let W=0,D=0,L=0;
+   const rows=done.map(x=>{const isHome=x.hk===club,them=isHome?x.away:x.home,us=isHome?x.home:x.away,team=teamSuffix(us,isHome?x.hc:x.ac),a=score(isHome?x.hs:x.as),b=score(isHome?x.as:x.hs),pu=pts(isHome?x.hs:x.as),pt=pts(isHome?x.as:x.hs);if(pu>pt)W++;else if(pu<pt)L++;else D++;
+     return `<li><div class="rmeta">${esc(parseD(x.date).toLocaleDateString('en-IE',{weekday:'short',day:'numeric',month:'short'}))}${x.grade?` \u00b7 ${esc(x.grade)}`:''} \u00b7 ${esc(x.sport)}${team?` \u00b7 ${esc(cname)} ${esc(team)}`:''}</div><div class="rline"><span class="${pu>pt?'w us':pu===pt?'w':''}">${esc(cname)} ${a}</span> \u00b7 <span class="${pt>=pu?'w':''}">${esc(them)} ${b}</span></div></li>`}).join('');
+   $('#results').innerHTML=done.length?`<section class="results" aria-label="Match results"><div class="rhead"><h2>Results</h2><span class="tally"><b class="tw">Won ${W}</b> \u00b7 <b>Drawn ${D}</b> \u00b7 <b>Lost ${L}</b></span></div><ul class="rlist">${rows}</ul></section>`:'';}
   const byDay=new Map();shown.forEach(x=>{if(!byDay.has(x.date))byDay.set(x.date,[]);byDay.get(x.date).push(x)});
   const days=[...byDay.keys()].sort();
   let empty='';
