@@ -57,6 +57,8 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html app.js _site/
+          # Add a version to app.js so browsers fetch the new copy after each change
+          sed -i "s|src=\"app.js\"|src=\"app.js?v=${GITHUB_SHA::7}\"|" _site/index.html
           node scripts/fetch-fixtures.mjs _site/fixtures.json
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
