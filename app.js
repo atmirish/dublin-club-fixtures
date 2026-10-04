@@ -16,7 +16,7 @@ const slug=k=>k.replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 const titleCase=k=>k.replace(/\b\w/g,c=>c.toUpperCase());
 
 const ONLY='ballinteer st johns';
-const state={data:null,fx:[],club:ONLY,sport:'all',grade:'all',err:'',loading:true,showRes:false};
+const state={data:null,fx:[],club:ONLY,sport:'all',grade:'all',venue:'all',err:'',loading:true,showRes:false};
 
 function expand(rows,comps){return rows.map(r=>({id:r[0],date:r[1],time:r[2],sport:r[3],grade:r[4],comp:comps[r[5]]||'',home:r[6],away:r[7],hc:r[8]||r[6],ac:r[9]||r[7],venue:r[10],status:r[11],hs:r[12],as:r[13],hk:ckey(r[8]||r[6]),ak:ckey(r[9]||r[7])}))}
 function clubIndex(){
@@ -54,12 +54,15 @@ function render(){
   if(state.sport!=='all'&&!sports.includes(state.sport))state.sport='all';
   if(state.grade!=='all'&&!grades.includes(state.grade))state.grade='all';
   const chip=(k,v,l,on)=>`<button class="chip" data-${k}="${esc(v)}" aria-pressed="${on}">${esc(l)}</button>`;
-  $('#filters').innerHTML=mine.length>1&&(sports.length>1||grades.length>1)?(chip('sport','all','All codes',state.sport==='all')+(sports.length>1?sports.map(s=>chip('sport',s,s,state.sport===s)).join(''):'')+
-    (grades.length>1?'<span class="sep"></span>'+chip('grade','all','All ages',state.grade==='all')+grades.map(g=>chip('grade',g,g,state.grade===g)).join(''):'')):'';
+  {const hasHA=mine.some(x=>x.hk===club)&&mine.some(x=>x.hk!==club),g=[];if(!hasHA)state.venue='all';
+   if(hasHA)g.push(chip('venue','all','Home & away',state.venue==='all')+chip('venue','home','Home',state.venue==='home')+chip('venue','away','Away',state.venue==='away'));
+   if(sports.length>1)g.push(chip('sport','all','All codes',state.sport==='all')+sports.map(s=>chip('sport',s,s,state.sport===s)).join(''));
+   if(grades.length>1)g.push(chip('grade','all','All ages',state.grade==='all')+grades.map(v=>chip('grade',v,v,state.grade===v)).join(''));
+   $('#filters').innerHTML=mine.length>1?g.join('<span class="sep"></span>'):'';}
   const home=mine.filter(x=>x.hk===club).length;
   $('#summary').innerHTML=club&&mine.length?`<div class="summary"><span class="club">${esc(cname)}</span><span class="nums">${mine.length} game${mine.length===1?'':'s'} · ${home} home · ${mine.length-home} away</span></div>`:'';
 
-  const shown=mine.filter(x=>(state.sport==='all'||x.sport===state.sport)&&(state.grade==='all'||x.grade===state.grade));
+  const shown=mine.filter(x=>(state.sport==='all'||x.sport===state.sport)&&(state.grade==='all'||x.grade===state.grade)&&(state.venue==='all'||(state.venue==='home')===(x.hk===club)));
   {const done=shown.filter(x=>x.status!=='Postponed'&&score(x.hs)&&score(x.as)).sort((p,q)=>(p.date+(p.time||'')).localeCompare(q.date+(q.time||'')));let W=0,D=0,L=0;
    const rows=done.map(x=>{const isHome=x.hk===club,them=isHome?x.away:x.home,us=isHome?x.home:x.away,team=teamSuffix(us,isHome?x.hc:x.ac),a=score(isHome?x.hs:x.as),b=score(isHome?x.as:x.hs),pu=pts(isHome?x.hs:x.as),pt=pts(isHome?x.as:x.hs);if(pu>pt)W++;else if(pu<pt)L++;else D++;
      return `<li><div class="rmeta">${esc(parseD(x.date).toLocaleDateString('en-IE',{weekday:'short',day:'numeric',month:'short'}))}${x.grade?` \u00b7 ${esc(x.grade)}`:''} \u00b7 ${esc(x.sport)}${team?` \u00b7 ${esc(cname)} ${esc(team)}`:''}</div><div class="rline"><span class="${pu>pt?'w us':pu===pt?'w':''}">${esc(cname)} ${a}</span> \u00b7 <span class="${pt>=pu?'w':''}">${esc(them)} ${b}</span></div></li>`}).join('');
@@ -98,8 +101,8 @@ $('#club').addEventListener('change',e=>{state.club=e.target.value;lsSet('club',
   if(state.club&&window.goatcounter&&window.goatcounter.count){const ci=clubIndex().find(x=>x.key===state.club);try{window.goatcounter.count({path:'club/'+slug(state.club),title:ci?ci.name:state.club,event:true})}catch(_){}}
   state.sport='all';state.grade='all';
   try{history.replaceState(null,'',state.club?'#'+slug(state.club):location.pathname+location.search)}catch(_){}render()});
-document.addEventListener('click',e=>{if(e.target.closest('#rtoggle')){state.showRes=!state.showRes;render();return}const b=e.target.closest('[data-sport],[data-grade]');if(!b)return;
-  if(b.dataset.sport!==undefined)state.sport=b.dataset.sport;else state.grade=b.dataset.grade;render()});
+document.addEventListener('click',e=>{if(e.target.closest('#rtoggle')){state.showRes=!state.showRes;render();return}const b=e.target.closest('[data-sport],[data-grade],[data-venue]');if(!b)return;
+  if(b.dataset.venue!==undefined)state.venue=b.dataset.venue;else if(b.dataset.sport!==undefined)state.sport=b.dataset.sport;else state.grade=b.dataset.grade;render()});
 window.addEventListener('hashchange',render);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.data&&Date.now()-new Date(state.data.updatedAt).getTime()>30*60*1000)load()});
 render();load();
