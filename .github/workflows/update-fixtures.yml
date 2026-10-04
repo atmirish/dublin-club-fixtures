@@ -12,10 +12,8 @@ on:
     branches: [main]
   workflow_dispatch: {}
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+# No permissions by default; the deploy job asks only for what it needs.
+permissions: {}
 
 concurrency:
   group: pages
@@ -28,32 +26,41 @@ jobs:
       run: ${{ steps.hour.outputs.run }}
     steps:
       - id: hour
+        env:
+          EVENT: ${{ github.event_name }}
         run: |
           h=$(TZ=Europe/Dublin date +%H)
           echo "Irish time hour: $h"
-          if [ "${{ github.event_name }}" != "schedule" ]; then echo "run=true" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT" != "schedule" ]; then echo "run=true" >> "$GITHUB_OUTPUT"
           else case "$h" in 08|12|16|20) echo "run=true" >> "$GITHUB_OUTPUT";; *) echo "run=false" >> "$GITHUB_OUTPUT";; esac; fi
 
   deploy:
     needs: check
     if: needs.check.outputs.run == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # Actions are pinned to exact commits; Dependabot proposes updates.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: 20
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
       - name: Build site
         run: |
           mkdir -p _site
-          cp index.html _site/
+          cp index.html app.js _site/
           node scripts/fetch-fixtures.mjs _site/fixtures.json
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: _site
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
