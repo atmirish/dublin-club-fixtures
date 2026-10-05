@@ -105,5 +105,52 @@ document.addEventListener('click',e=>{if(e.target.closest('#rtoggle')){state.sho
   if(b.dataset.venue!==undefined)state.venue=b.dataset.venue;else if(b.dataset.sport!==undefined)state.sport=b.dataset.sport;else state.grade=b.dataset.grade;render()});
 window.addEventListener('hashchange',render);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.data&&Date.now()-new Date(state.data.updatedAt).getTime()>30*60*1000)load()});
+// ---- Result alerts (OneSignal web push) ----
+const OS_APP='a9b7cfcb-32ce-447b-8bfb-a65e54a73e0a';
+const BASE=location.pathname.replace(/[^/]*$/,'')||'/';
+const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const isStandalone=()=>{try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}catch(_){return false}};
+const push={os:null,ready:false,supported:false,on:false,busy:false,tip:false,msg:''};
+function renderAlerts(){
+  const el=$('#alerts');if(!el)return;
+  if(isIOS&&!isStandalone()){
+    el.innerHTML=`<button class="abtn" id="atoggle" aria-expanded="${push.tip}">Get result alerts</button>`+
+      (push.tip?`<p class="atip">On iPhone, alerts need this site on your Home Screen. Tap the <b>Share</b> button, then <b>Add to Home Screen</b>. Open it from your Home Screen and tap <b>Get result alerts</b> again.</p>`:'');
+    return}
+  if(!push.ready||!push.supported){el.innerHTML='';return}
+  el.innerHTML=push.on
+    ?`<span class="aon">Result alerts are on</span><button class="alink" id="aoff"${push.busy?' disabled':''}>Turn off</button>`
+    :`<button class="abtn" id="aon"${push.busy?' disabled':''}>${push.busy?'Setting up…':'Get result alerts'}</button>`;
+  if(push.msg)el.innerHTML+=`<p class="atip">${esc(push.msg)}</p>`;
+}
+async function alertsOn(){
+  const OS=push.os;if(!OS)return;push.busy=true;push.msg='';renderAlerts();
+  try{
+    await OS.User.PushSubscription.optIn();
+    if(!OS.Notifications.permission)push.msg='Notifications are blocked for this site. Allow them in your browser or phone settings, then try again.';
+    else{try{window.goatcounter&&window.goatcounter.count&&window.goatcounter.count({path:'alerts/on',title:'Result alerts turned on',event:true})}catch(_){}}
+  }catch(_){push.msg='Couldn’t turn on alerts. Please try again.'}
+  push.on=!!OS.User.PushSubscription.optedIn;push.busy=false;renderAlerts();
+}
+async function alertsOff(){
+  const OS=push.os;if(!OS)return;push.busy=true;renderAlerts();
+  try{await OS.User.PushSubscription.optOut()}catch(_){}
+  push.on=!!OS.User.PushSubscription.optedIn;push.busy=false;renderAlerts();
+}
+document.addEventListener('click',e=>{
+  if(e.target.closest('#atoggle')){push.tip=!push.tip;renderAlerts()}
+  else if(e.target.closest('#aon'))alertsOn();
+  else if(e.target.closest('#aoff'))alertsOff();
+});
+window.OneSignalDeferred=window.OneSignalDeferred||[];
+window.OneSignalDeferred.push(async function(OS){
+  try{
+    await OS.init({appId:OS_APP,serviceWorkerPath:BASE.slice(1)+'OneSignalSDKWorker.js',serviceWorkerParam:{scope:BASE},notifyButton:{enable:false}});
+    push.os=OS;push.supported=!!OS.Notifications.isPushSupported();push.on=!!OS.User.PushSubscription.optedIn;push.ready=true;
+    OS.User.PushSubscription.addEventListener('change',ev=>{push.on=!!(ev&&ev.current&&ev.current.optedIn);renderAlerts()});
+  }catch(_){push.ready=false}
+  renderAlerts();
+});
+renderAlerts();
 render();load();
 })();
