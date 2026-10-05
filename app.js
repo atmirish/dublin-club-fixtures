@@ -148,7 +148,7 @@ async function finishOn(){
   try{
     await OS.User.PushSubscription.optIn();
     push.on=!!OS.User.PushSubscription.optedIn;
-    if(push.on){setOpted(true);try{window.goatcounter&&window.goatcounter.count&&window.goatcounter.count({path:'alerts/on',title:'Result alerts turned on',event:true})}catch(_){}}
+    if(push.on){setOpted(true);syncPreview();try{window.goatcounter&&window.goatcounter.count&&window.goatcounter.count({path:'alerts/on',title:'Result alerts turned on',event:true})}catch(_){}}
     else push.msg='Couldn’t turn on alerts. Please try again.';
   }catch(_){push.msg='Couldn’t turn on alerts. Please try again.'}
   push.busy=false;push.want='';renderAlerts();
@@ -186,8 +186,25 @@ window.OneSignalDeferred.push(async function(OS){
     OS.User.PushSubscription.addEventListener('change',ev=>{push.on=!!(ev&&ev.current&&ev.current.optedIn);setOpted(push.on);renderAlerts()});
     if(push.want==='on')return finishOn();
     if(push.want==='off')return finishOff();
-    setOpted(push.on);
+    setOpted(push.on);syncPreview();
   }catch(_){push.ready=false;push.busy=false;push.want='';push.msg='Couldn’t reach the alerts service. Please try again.'}
+  renderAlerts();
+});
+// Approver's devices: tap the header icon 5 times to switch "preview mode" on or off.
+// Preview devices are tagged role=preview in OneSignal and get each alert first, to approve in GitHub.
+const PREV='cfPreview';
+const previewFlag=()=>{try{return localStorage.getItem(PREV)}catch(_){return null}};
+function syncPreview(){
+  const OS=push.os,f=previewFlag();if(!OS||!push.on||!f)return;
+  try{f==='1'?OS.User.addTag('role','preview'):OS.User.removeTag('role')}catch(_){}
+}
+let taps=0,tapT=0;
+document.addEventListener('click',e=>{
+  if(!ALERTS_ON||!e.target.closest('.brand img'))return;
+  const now=Date.now();taps=now-tapT<800?taps+1:1;tapT=now;if(taps<5)return;taps=0;
+  const on=previewFlag()!=='1';try{localStorage.setItem(PREV,on?'1':'0')}catch(_){}
+  push.msg=!(push.ready?push.on:optedLocal())?'Turn on result alerts first, then switch on preview mode.':on?'Preview mode is on. Alerts will come to this device first, to approve in GitHub.':'Preview mode is off.';
+  if(push.ready)syncPreview();else if(optedLocal())loadOS();
   renderAlerts();
 });
 renderAlerts();
