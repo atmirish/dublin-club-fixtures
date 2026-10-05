@@ -3,9 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://gc.zgo.at; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://atmirish.goatcounter.com; connect-src 'self' https://atmirish.goatcounter.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://gc.zgo.at https://cdn.onesignal.com https://onesignal.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://onesignal.com https://cdn.onesignal.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://atmirish.goatcounter.com https://onesignal.com https://*.onesignal.com; connect-src 'self' https://atmirish.goatcounter.com https://onesignal.com https://*.onesignal.com; frame-src https://onesignal.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="description" content="This week's fixtures for any Dublin GAA, camogie or ladies football club.">
 <meta name="theme-color" content="#0f2a1f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BSJ Fixtures">
 <title>Dublin Club Fixtures</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -66,6 +70,11 @@ main{max-width:760px;margin:0 auto;padding:14px 16px 40px}
 .rhead h2{font:800 20px/1.1 var(--display);letter-spacing:.04em;text-transform:uppercase;margin:0}
 .tally{font-size:16.5px;color:var(--ink2);font-variant-numeric:tabular-nums}.tally b{color:var(--ink)}.tally .tw{color:var(--win)}
 .rbtn{display:block;margin:8px 0 6px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:6px 14px;font:600 14px var(--body);cursor:pointer}
+.alerts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:0 0 12px}.alerts:empty{display:none}
+.abtn{border:0;background:var(--accent);color:var(--on-accent);font:700 14px var(--body);border-radius:999px;padding:8px 16px;cursor:pointer}.abtn:disabled{opacity:.6;cursor:default}
+.aon{font:700 14px var(--body);color:var(--win)}
+.alink{border:0;background:none;color:var(--ink2);font:600 14px var(--body);text-decoration:underline;cursor:pointer;padding:0}
+.atip{flex-basis:100%;margin:0;font-size:13.5px;color:var(--ink2);max-width:60ch}
 .rlist{list-style:none;margin:0;padding:0}
 .rlist li{padding:7px 0;border-top:1px solid var(--line);min-width:0}.rlist li:first-child{border-top:0}
 .rmeta{font-size:12.5px;color:var(--ink3)}
@@ -86,12 +95,14 @@ main{max-width:760px;margin:0 auto;padding:14px 16px 40px}
 </div></header>
 <main>
   <div class="status" id="status">Loading fixtures…</div>
+  <div class="alerts" id="alerts"></div>
   <div id="summary"></div>
   <div class="bar" id="filters" role="group" aria-label="Filter fixtures"></div>
   <div id="results"></div>
   <div id="days"></div>
   <p class="foot">Fixtures for camogie, ladies football, and football and hurling, from juvenile to adult, are pulled from the public Dublin fixture feeds behind dublingaa.ie (SportsManager). The data updates four times a day, at 8am, 12 noon, 4pm and 8pm. This page is unofficial and isn’t run by Dublin GAA or SportLoMo, so check your club’s noticeboard if something looks off.</p>
 </main>
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <script src="app.js"></script>
 <script data-goatcounter="https://atmirish.goatcounter.com/count" async src="https://gc.zgo.at/count.v4.js" crossorigin="anonymous" integrity="sha384-nRw6qfbWyJha9LhsOtSb2YJDyZdKvvCFh0fJYlkquSFjUxp9FVNugbfy8q1jdxI+"></script>
 </body>
