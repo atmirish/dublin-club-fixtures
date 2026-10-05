@@ -10,7 +10,12 @@ on:
     - cron: '7 7,8,11,12,15,16,19,20 * * *'
   push:
     branches: [main]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      test_alert:
+        description: Send a test alert (preview and approval; only ever goes to preview devices)
+        type: boolean
+        default: false
 
 # No permissions by default; the deploy job asks only for what it needs.
 permissions: {}
@@ -78,6 +83,7 @@ jobs:
           ONESIGNAL_API_KEY: ${{ secrets.ONESIGNAL_API_KEY }}
           ONESIGNAL_APP_ID: a9b7cfcb-32ce-447b-8bfb-a65e54a73e0a
           SITE_URL: https://atmirish.github.io/dublin-club-fixtures/
+          TEST_ALERT: ${{ inputs.test_alert }}
         run: node scripts/notify-results.mjs prepare _site/fixtures.json previous-fixtures.json
 
   # Waits for approval (Settings > Environments > result-alerts > Required reviewers),
