@@ -15,10 +15,6 @@ on:
 # No permissions by default; the deploy job asks only for what it needs.
 permissions: {}
 
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -38,6 +34,13 @@ jobs:
     needs: check
     if: needs.check.outputs.run == 'true'
     runs-on: ubuntu-latest
+    # Only one publish at a time. (Kept on this job so a result alert waiting
+    # for approval never holds up the fixture updates.)
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    outputs:
+      alert: ${{ steps.prepare.outputs.alert }}
     permissions:
       contents: read
       pages: write
@@ -68,10 +71,35 @@ jobs:
           path: _site
       - id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
-      - name: Send result alerts
+      - name: Prepare result alert and send a preview to the approver
+        id: prepare
         continue-on-error: true
         env:
           ONESIGNAL_API_KEY: ${{ secrets.ONESIGNAL_API_KEY }}
           ONESIGNAL_APP_ID: a9b7cfcb-32ce-447b-8bfb-a65e54a73e0a
           SITE_URL: https://atmirish.github.io/dublin-club-fixtures/
-        run: node scripts/notify-results.mjs _site/fixtures.json previous-fixtures.json
+        run: node scripts/notify-results.mjs prepare _site/fixtures.json previous-fixtures.json
+
+  # Waits for approval (Settings > Environments > result-alerts > Required reviewers),
+  # then sends the alert to everyone. Rejected or ignored alerts are never sent.
+  send-alert:
+    needs: deploy
+    if: needs.deploy.outputs.alert != ''
+    runs-on: ubuntu-latest
+    environment: result-alerts
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Send result alert to everyone
+        env:
+          ALERT: ${{ needs.deploy.outputs.alert }}
+          ONESIGNAL_API_KEY: ${{ secrets.ONESIGNAL_API_KEY }}
+          ONESIGNAL_APP_ID: a9b7cfcb-32ce-447b-8bfb-a65e54a73e0a
+          SITE_URL: https://atmirish.github.io/dublin-club-fixtures/
+        run: node scripts/notify-results.mjs send
