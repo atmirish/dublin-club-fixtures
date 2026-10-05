@@ -19,6 +19,7 @@ const ICON = new URL('icon-192.png', SITE || 'https://atmirish.github.io/dublin-
 const MAX_AGE_HOURS = 3; // an approval later than this is too late; the alert is skipped
 
 if (!KEY || !APP) { console.log('No OneSignal key set; skipping result alerts.'); process.exit(0); }
+const PREVIEW = { filters: [{ field: 'tag', key: 'role', relation: '=', value: 'preview' }] };
 
 async function push(target, heading, contents) {
   const res = await fetch('https://api.onesignal.com/notifications?c=push', {
@@ -42,6 +43,12 @@ if (mode === 'send') {
   catch { console.log('No alert to send.'); process.exit(0); }
   const ageH = (Date.now() - new Date(alert.createdAt).getTime()) / 36e5;
   if (!(ageH <= MAX_AGE_HOURS)) { console.log(`Approved ${ageH.toFixed(1)} hours after the results came in; too late, not sending.`); process.exit(0); }
+  if (alert.test) {
+    console.log(`Test alert approved; sending to preview devices only:\n${alert.heading}\n${alert.contents}`);
+    const t = await push(PREVIEW, alert.heading, alert.contents);
+    if (!t.ok) process.exitCode = 1;
+    process.exit();
+  }
   console.log(`Sending to everyone:\n${alert.heading}\n${alert.contents}`);
   let r = await push({ included_segments: ['Total Subscriptions'] }, alert.heading, alert.contents);
   if (!r.ok && /segment/i.test(r.text)) r = await push({ included_segments: ['Subscribed Users'] }, alert.heading, alert.contents);
@@ -50,6 +57,23 @@ if (mode === 'send') {
 }
 
 if (mode !== 'prepare') { console.log('Usage: notify-results.mjs prepare <new> <previous> | send'); process.exit(1); }
+
+async function queue(alert, count = 1) {
+  console.log(`Alert waiting for approval:\n${alert.heading}\n${alert.contents}`);
+  if (process.env.GITHUB_OUTPUT) {
+    await appendFile(process.env.GITHUB_OUTPUT, `alert=${Buffer.from(JSON.stringify(alert)).toString('base64')}\n`);
+  }
+  // Preview to the approver's devices only
+  const warn = count > 15 ? `\n⚠ ${count} results at once – check the feed looks right.` : '';
+  await push(PREVIEW, `Preview: ${alert.heading}`, `${alert.contents}${warn}\nApprove in GitHub to send this to everyone.`);
+}
+
+// Manual test (Actions > Update fixtures > Run workflow > "Send a test alert"):
+// goes through preview and approval, but is only ever sent to preview devices.
+if (process.env.TEST_ALERT === 'true') {
+  await queue({ heading: 'TEST: BSJ result', contents: 'U12 Football (A): Won 2-10 v 1-08 Test Club\nThis is a test of the approval step.', createdAt: new Date().toISOString(), test: true });
+  process.exit();
+}
 
 let prev;
 try { prev = JSON.parse(await readFile(prevPath, 'utf8')); }
@@ -84,17 +108,4 @@ const lines = fresh.map(r => {
 const heading = fresh.length === 1 ? 'BSJ result' : `${fresh.length} new BSJ results`;
 const MAX = 6;
 const contents = lines.slice(0, MAX).join('\n') + (lines.length > MAX ? `\n+${lines.length - MAX} more on the site` : '');
-const alert = { heading, contents, createdAt: new Date().toISOString() };
-
-console.log(`Alert waiting for approval:\n${heading}\n${contents}`);
-if (process.env.GITHUB_OUTPUT) {
-  await appendFile(process.env.GITHUB_OUTPUT, `alert=${Buffer.from(JSON.stringify(alert)).toString('base64')}\n`);
-}
-
-// Preview to the approver's devices only
-const warn = fresh.length > 15 ? `\n⚠ ${fresh.length} results at once – check the feed looks right.` : '';
-await push(
-  { filters: [{ field: 'tag', key: 'role', relation: '=', value: 'preview' }] },
-  `Preview: ${heading}`,
-  `${contents}${warn}\nApprove in GitHub to send this to everyone.`
-);
+await queue({ heading, contents, createdAt: new Date().toISOString() }, fresh.length);
