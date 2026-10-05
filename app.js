@@ -113,8 +113,22 @@ const isStandalone=()=>{try{return matchMedia('(display-mode: standalone)').matc
 // Hidden for everyone for now. Shown only when the page is opened with ?alerts=1
 // (remembered on that device; ?alerts=0 hides it again) or opened from the Home Screen.
 const ALERTS_ON=(()=>{try{const m=/[?&]alerts=([01])/.exec(location.search);if(m)localStorage.setItem('bsjAlerts',m[1]);return localStorage.getItem('bsjAlerts')==='1'||isStandalone()}catch(_){return isStandalone()}})();
-if(ALERTS_ON){const s=document.createElement('script');s.src='https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';s.defer=true;document.head.appendChild(s)}
-const push={os:null,ready:false,supported:false,on:false,busy:false,tip:false,msg:''};
+// OneSignal is only loaded when someone taps "Get result alerts", or on later visits
+// from a device that already turned alerts on (remembered on that device).
+const OPT='cfAlertsOptIn';
+const optedLocal=()=>{try{return localStorage.getItem(OPT)==='1'}catch(_){return false}};
+const setOpted=v=>{try{v?localStorage.setItem(OPT,'1'):localStorage.removeItem(OPT)}catch(_){}};
+const canPush=()=>'Notification' in window&&'serviceWorker' in navigator&&'PushManager' in window;
+const push={os:null,ready:false,on:false,busy:false,tip:false,msg:'',want:''};
+let osLoading=false;
+function loadOS(){
+  if(osLoading)return;osLoading=true;
+  const s=document.createElement('script');s.src='https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';s.defer=true;
+  s.onerror=()=>{osLoading=false;s.remove();if(push.want)push.msg='Couldn’t reach the alerts service. Please try again.';push.busy=false;push.want='';renderAlerts()};
+  document.head.appendChild(s);
+}
+if(ALERTS_ON&&optedLocal())loadOS();
+const NOTE='<p class="atip">Alerts are optional and sent by OneSignal. Only an ID for this device is stored, no name, email or phone number. You can turn them off at any time.</p>';
 function renderAlerts(){
   const el=$('#alerts');if(!el)return;
   if(!ALERTS_ON){el.innerHTML='';return}
@@ -122,25 +136,42 @@ function renderAlerts(){
     el.innerHTML=`<button class="abtn" id="atoggle" aria-expanded="${push.tip}">Get result alerts</button>`+
       (push.tip?`<p class="atip">On iPhone, alerts need this site on your Home Screen. Tap the <b>Share</b> button, then <b>Add to Home Screen</b>. Open it from your Home Screen and tap <b>Get result alerts</b> again.</p>`:'');
     return}
-  if(!push.ready||!push.supported){el.innerHTML='';return}
-  el.innerHTML=push.on
+  if(!canPush()){el.innerHTML='';return}
+  const on=push.ready?push.on:optedLocal();
+  el.innerHTML=on
     ?`<span class="aon">Result alerts are on</span><button class="alink" id="aoff"${push.busy?' disabled':''}>Turn off</button>`
-    :`<button class="abtn" id="aon"${push.busy?' disabled':''}>${push.busy?'Setting up…':'Get result alerts'}</button>`;
+    :`<button class="abtn" id="aon"${push.busy?' disabled':''}>${push.busy?'Setting up…':'Get result alerts'}</button>`+NOTE;
   if(push.msg)el.innerHTML+=`<p class="atip">${esc(push.msg)}</p>`;
 }
-async function alertsOn(){
-  const OS=push.os;if(!OS)return;push.busy=true;push.msg='';renderAlerts();
+async function finishOn(){
+  const OS=push.os;
   try{
     await OS.User.PushSubscription.optIn();
-    if(!OS.Notifications.permission)push.msg='Notifications are blocked for this site. Allow them in your browser or phone settings, then try again.';
-    else{try{window.goatcounter&&window.goatcounter.count&&window.goatcounter.count({path:'alerts/on',title:'Result alerts turned on',event:true})}catch(_){}}
+    push.on=!!OS.User.PushSubscription.optedIn;
+    if(push.on){setOpted(true);try{window.goatcounter&&window.goatcounter.count&&window.goatcounter.count({path:'alerts/on',title:'Result alerts turned on',event:true})}catch(_){}}
+    else push.msg='Couldn’t turn on alerts. Please try again.';
   }catch(_){push.msg='Couldn’t turn on alerts. Please try again.'}
-  push.on=!!OS.User.PushSubscription.optedIn;push.busy=false;renderAlerts();
+  push.busy=false;push.want='';renderAlerts();
 }
-async function alertsOff(){
-  const OS=push.os;if(!OS)return;push.busy=true;renderAlerts();
+async function finishOff(){
+  const OS=push.os;
   try{await OS.User.PushSubscription.optOut()}catch(_){}
-  push.on=!!OS.User.PushSubscription.optedIn;push.busy=false;renderAlerts();
+  push.on=!!OS.User.PushSubscription.optedIn;if(!push.on)setOpted(false);
+  push.busy=false;push.want='';renderAlerts();
+}
+async function alertsOn(){
+  push.busy=true;push.msg='';renderAlerts();
+  // Ask for permission straight away, while the tap still counts (needed on iPhone and Safari)
+  let perm=Notification.permission;
+  if(perm==='default'){try{perm=await Notification.requestPermission()}catch(_){}}
+  if(perm!=='granted'){push.busy=false;push.msg='Notifications are blocked for this site. Allow them in your browser or phone settings, then try again.';renderAlerts();return}
+  push.want='on';
+  if(push.ready)finishOn();else loadOS();
+}
+function alertsOff(){
+  push.busy=true;push.msg='';renderAlerts();
+  push.want='off';
+  if(push.ready)finishOff();else loadOS();
 }
 document.addEventListener('click',e=>{
   if(e.target.closest('#atoggle')){push.tip=!push.tip;renderAlerts()}
@@ -151,9 +182,12 @@ window.OneSignalDeferred=window.OneSignalDeferred||[];
 window.OneSignalDeferred.push(async function(OS){
   try{
     await OS.init({appId:OS_APP,serviceWorkerPath:BASE.slice(1)+'OneSignalSDKWorker.js',serviceWorkerParam:{scope:BASE},notifyButton:{enable:false}});
-    push.os=OS;push.supported=!!OS.Notifications.isPushSupported();push.on=!!OS.User.PushSubscription.optedIn;push.ready=true;
-    OS.User.PushSubscription.addEventListener('change',ev=>{push.on=!!(ev&&ev.current&&ev.current.optedIn);renderAlerts()});
-  }catch(_){push.ready=false}
+    push.os=OS;push.on=!!OS.User.PushSubscription.optedIn;push.ready=true;
+    OS.User.PushSubscription.addEventListener('change',ev=>{push.on=!!(ev&&ev.current&&ev.current.optedIn);setOpted(push.on);renderAlerts()});
+    if(push.want==='on')return finishOn();
+    if(push.want==='off')return finishOff();
+    setOpted(push.on);
+  }catch(_){push.ready=false;push.busy=false;push.want='';push.msg='Couldn’t reach the alerts service. Please try again.'}
   renderAlerts();
 });
 renderAlerts();
