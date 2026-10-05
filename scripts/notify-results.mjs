@@ -7,6 +7,7 @@ const [, , newPath, prevPath] = process.argv;
 const KEY = process.env.ONESIGNAL_API_KEY;
 const APP = process.env.ONESIGNAL_APP_ID;
 const SITE = process.env.SITE_URL;
+const ICON = new URL('icon-192.png', SITE || 'https://atmirish.github.io/dublin-club-fixtures/').href;
 
 if (!KEY || !APP) { console.log('No OneSignal key set; skipping result alerts.'); process.exit(0); }
 
@@ -45,7 +46,8 @@ async function send(segment) {
     headers: { 'Content-Type': 'application/json', Authorization: `Key ${KEY}` },
     body: JSON.stringify({
       app_id: APP, target_channel: 'push', included_segments: [segment],
-      headings: { en: heading }, contents: { en: contents }, url: SITE
+      headings: { en: heading }, contents: { en: contents }, url: SITE,
+      chrome_web_icon: ICON, firefox_icon: ICON
     }),
     signal: AbortSignal.timeout(30000)
   });
