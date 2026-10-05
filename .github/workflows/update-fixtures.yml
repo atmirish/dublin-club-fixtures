@@ -56,7 +56,7 @@ jobs:
       - name: Build site
         run: |
           mkdir -p _site
-          cp index.html app.js manifest.webmanifest OneSignalSDKWorker.js icon-192.png icon-512.png apple-touch-icon.png _site/
+          cp index.html app.js manifest.webmanifest OneSignalSDKWorker.js icon-192.png icon-512.png icon-night-192.png apple-touch-icon.png _site/
           # Add a version to app.js so browsers fetch the new copy after each change
           sed -i "s|src=\"app.js\"|src=\"app.js?v=${GITHUB_SHA::7}\"|" _site/index.html
           node scripts/fetch-fixtures.mjs _site/fixtures.json
