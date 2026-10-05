@@ -110,9 +110,14 @@ const OS_APP='a9b7cfcb-32ce-447b-8bfb-a65e54a73e0a';
 const BASE=location.pathname.replace(/[^/]*$/,'')||'/';
 const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const isStandalone=()=>{try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}catch(_){return false}};
+// Hidden for everyone for now. Shown only when the page is opened with ?alerts=1
+// (remembered on that device; ?alerts=0 hides it again) or opened from the Home Screen.
+const ALERTS_ON=(()=>{try{const m=/[?&]alerts=([01])/.exec(location.search);if(m)localStorage.setItem('bsjAlerts',m[1]);return localStorage.getItem('bsjAlerts')==='1'||isStandalone()}catch(_){return isStandalone()}})();
+if(ALERTS_ON){const s=document.createElement('script');s.src='https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';s.defer=true;document.head.appendChild(s)}
 const push={os:null,ready:false,supported:false,on:false,busy:false,tip:false,msg:''};
 function renderAlerts(){
   const el=$('#alerts');if(!el)return;
+  if(!ALERTS_ON){el.innerHTML='';return}
   if(isIOS&&!isStandalone()){
     el.innerHTML=`<button class="abtn" id="atoggle" aria-expanded="${push.tip}">Get result alerts</button>`+
       (push.tip?`<p class="atip">On iPhone, alerts need this site on your Home Screen. Tap the <b>Share</b> button, then <b>Add to Home Screen</b>. Open it from your Home Screen and tap <b>Get result alerts</b> again.</p>`:'');
