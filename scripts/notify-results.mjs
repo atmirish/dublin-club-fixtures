@@ -21,18 +21,24 @@ const MAX_AGE_HOURS = 3; // an approval later than this is too late; the alert i
 if (!KEY || !APP) { console.log('No OneSignal key set; skipping result alerts.'); process.exit(0); }
 const PREVIEW = { filters: [{ field: 'tag', key: 'role', relation: '=', value: 'preview' }] };
 
+// New OneSignal keys (os_v2_...) use "Key", older REST API keys use "Basic"; try the likely one first.
+const SCHEMES = KEY.startsWith('os_v2_') ? ['Key', 'Basic'] : ['Basic', 'Key'];
 async function push(target, heading, contents) {
-  const res = await fetch('https://api.onesignal.com/notifications?c=push', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Key ${KEY}` },
-    body: JSON.stringify({
-      app_id: APP, target_channel: 'push', ...target,
-      headings: { en: heading }, contents: { en: contents }, url: SITE,
-      chrome_web_icon: ICON, firefox_icon: ICON
-    }),
-    signal: AbortSignal.timeout(30000)
-  });
-  const text = await res.text();
+  let res, text;
+  for (const scheme of SCHEMES) {
+    res = await fetch('https://api.onesignal.com/notifications?c=push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `${scheme} ${KEY}` },
+      body: JSON.stringify({
+        app_id: APP, target_channel: 'push', ...target,
+        headings: { en: heading }, contents: { en: contents }, url: SITE,
+        chrome_web_icon: ICON, firefox_icon: ICON
+      }),
+      signal: AbortSignal.timeout(30000)
+    });
+    text = await res.text();
+    if (res.status !== 401 && res.status !== 403) break;
+  }
   console.log(`OneSignal replied ${res.status}: ${text}`);
   return { ok: res.ok, text };
 }
