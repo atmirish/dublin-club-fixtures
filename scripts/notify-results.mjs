@@ -1,15 +1,55 @@
-// Sends one push notification (via OneSignal) listing BSJ results that weren't on the live site before this run.
-// Usage: node scripts/notify-results.mjs <new fixtures.json> <previous fixtures.json>
+// Result alerts via OneSignal, with approval before anything goes to everyone.
+//
+//   node scripts/notify-results.mjs prepare <new fixtures.json> <previous fixtures.json>
+//     Finds BSJ results that weren't on the live site before this run, sends a PREVIEW
+//     only to devices tagged role=preview, and writes the alert to $GITHUB_OUTPUT as "alert".
+//
+//   node scripts/notify-results.mjs send
+//     Sends the approved alert (from the ALERT env var) to all subscribers.
+//     Runs in the "result-alerts" environment, which needs a reviewer to approve it.
+//
 // Needs ONESIGNAL_API_KEY (GitHub secret). Without it, or without the previous file, it does nothing.
-import { readFile } from 'node:fs/promises';
+import { readFile, appendFile } from 'node:fs/promises';
 
-const [, , newPath, prevPath] = process.argv;
+const [, , mode, newPath, prevPath] = process.argv;
 const KEY = process.env.ONESIGNAL_API_KEY;
 const APP = process.env.ONESIGNAL_APP_ID;
 const SITE = process.env.SITE_URL;
 const ICON = new URL('icon-192.png', SITE || 'https://atmirish.github.io/dublin-club-fixtures/').href;
+const MAX_AGE_HOURS = 3; // an approval later than this is too late; the alert is skipped
 
 if (!KEY || !APP) { console.log('No OneSignal key set; skipping result alerts.'); process.exit(0); }
+
+async function push(target, heading, contents) {
+  const res = await fetch('https://api.onesignal.com/notifications?c=push', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Key ${KEY}` },
+    body: JSON.stringify({
+      app_id: APP, target_channel: 'push', ...target,
+      headings: { en: heading }, contents: { en: contents }, url: SITE,
+      chrome_web_icon: ICON, firefox_icon: ICON
+    }),
+    signal: AbortSignal.timeout(30000)
+  });
+  const text = await res.text();
+  console.log(`OneSignal replied ${res.status}: ${text}`);
+  return { ok: res.ok, text };
+}
+
+if (mode === 'send') {
+  let alert;
+  try { alert = JSON.parse(Buffer.from(process.env.ALERT || '', 'base64').toString('utf8')); }
+  catch { console.log('No alert to send.'); process.exit(0); }
+  const ageH = (Date.now() - new Date(alert.createdAt).getTime()) / 36e5;
+  if (!(ageH <= MAX_AGE_HOURS)) { console.log(`Approved ${ageH.toFixed(1)} hours after the results came in; too late, not sending.`); process.exit(0); }
+  console.log(`Sending to everyone:\n${alert.heading}\n${alert.contents}`);
+  let r = await push({ included_segments: ['Total Subscriptions'] }, alert.heading, alert.contents);
+  if (!r.ok && /segment/i.test(r.text)) r = await push({ included_segments: ['Subscribed Users'] }, alert.heading, alert.contents);
+  if (!r.ok) process.exitCode = 1;
+  process.exit();
+}
+
+if (mode !== 'prepare') { console.log('Usage: notify-results.mjs prepare <new> <previous> | send'); process.exit(1); }
 
 let prev;
 try { prev = JSON.parse(await readFile(prevPath, 'utf8')); }
@@ -19,6 +59,11 @@ const cur = JSON.parse(await readFile(newPath, 'utf8'));
 const score = s => { const m = /^\s*(\d+)\s*[;:-]\s*(\d+)\s*$/.exec(s || ''); return m ? [Number(m[1]), Number(m[2])] : null; };
 const show = p => `${p[0]}-${String(p[1]).padStart(2, '0')}`;
 const isResult = r => r[11] !== 'Postponed' && score(r[12]) && score(r[13]);
+// Feed text goes into notifications: keep it to plain, short, printable text
+const clean = (s, max = 40) => {
+  const t = String(s || '').normalize('NFKC').replace(/[\p{C}<>{}\[\]\\`]/gu, ' ').replace(/\s+/g, ' ').trim();
+  return t.length > max ? t.slice(0, max - 1) + '…' : t;
+};
 
 // columns: id, date, time, sport, grade, compIndex, homeTeam, awayTeam, homeClub, awayClub, venue, status, homeScore, awayScore
 const seen = new Set((prev.fx || []).filter(isResult).map(r => r[0]));
@@ -31,32 +76,25 @@ const lines = fresh.map(r => {
   const us = score(home ? r[12] : r[13]), them = score(home ? r[13] : r[12]);
   const a = us[0] * 3 + us[1], b = them[0] * 3 + them[1];
   const outcome = a > b ? 'Won' : a < b ? 'Lost' : 'Drew';
-  const team = (home ? r[6] : r[7]).replace(/^ballinteer\s*st\.?\s*john'?s\s*/i, '').trim();
-  const opp = home ? r[7] : r[6];
-  return `${[r[4], r[3]].filter(Boolean).join(' ')}${team ? ` (${team})` : ''}: ${outcome} ${show(us)} v ${show(them)} ${opp}`;
+  const team = clean((home ? r[6] : r[7]).replace(/^ballinteer\s*st\.?\s*john'?s\s*/i, ''), 20);
+  const opp = clean(home ? r[7] : r[6]);
+  return `${clean([r[4], r[3]].filter(Boolean).join(' '), 30)}${team ? ` (${team})` : ''}: ${outcome} ${show(us)} v ${show(them)} ${opp}`;
 });
 
 const heading = fresh.length === 1 ? 'BSJ result' : `${fresh.length} new BSJ results`;
 const MAX = 6;
 const contents = lines.slice(0, MAX).join('\n') + (lines.length > MAX ? `\n+${lines.length - MAX} more on the site` : '');
+const alert = { heading, contents, createdAt: new Date().toISOString() };
 
-async function send(segment) {
-  const res = await fetch('https://api.onesignal.com/notifications?c=push', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Key ${KEY}` },
-    body: JSON.stringify({
-      app_id: APP, target_channel: 'push', included_segments: [segment],
-      headings: { en: heading }, contents: { en: contents }, url: SITE,
-      chrome_web_icon: ICON, firefox_icon: ICON
-    }),
-    signal: AbortSignal.timeout(30000)
-  });
-  const text = await res.text();
-  return { ok: res.ok, status: res.status, text };
+console.log(`Alert waiting for approval:\n${heading}\n${contents}`);
+if (process.env.GITHUB_OUTPUT) {
+  await appendFile(process.env.GITHUB_OUTPUT, `alert=${Buffer.from(JSON.stringify(alert)).toString('base64')}\n`);
 }
 
-console.log(`${heading}:\n${contents}`);
-let r = await send('Total Subscriptions');
-if (!r.ok && /segment/i.test(r.text)) r = await send('Subscribed Users');
-console.log(`OneSignal replied ${r.status}: ${r.text}`);
-if (!r.ok) process.exitCode = 1;
+// Preview to the approver's devices only
+const warn = fresh.length > 15 ? `\n⚠ ${fresh.length} results at once – check the feed looks right.` : '';
+await push(
+  { filters: [{ field: 'tag', key: 'role', relation: '=', value: 'preview' }] },
+  `Preview: ${heading}`,
+  `${contents}${warn}\nApprove in GitHub to send this to everyone.`
+);
