@@ -17,7 +17,8 @@ const SCHEMES = (KEY || '').startsWith('os_v2_') ? ['Key', 'Basic'] : ['Basic', 
 const hash = id => createHash('sha256').update(String(id)).digest('hex').slice(0, 16);
 
 let prev = null;
-try { prev = JSON.parse(await readFile(statePath, 'utf8')); } catch {}
+const STATE_VERSION = 2; // bump to start counting afresh
+try { prev = JSON.parse(await readFile(statePath, 'utf8')); if (prev.v !== STATE_VERSION) prev = null; } catch {}
 async function save(state) {
   await mkdir(dirname(statePath), { recursive: true });
   await writeFile(statePath, JSON.stringify(state));
@@ -42,6 +43,7 @@ async function viaList() {
     const res = await api(`https://api.onesignal.com/players?app_id=${APP}&limit=300&offset=${offset}`);
     if (!res.ok) throw new Error(`list ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const j = await res.json();
+    if (!offset) console.log(`List API: total_count=${j.total_count}, returned=${(j.players || []).length}, fields=${JSON.stringify((j.players || []).map(p => [p.device_type, p.invalid_identifier, p.notification_types]))}`);
     for (const p of j.players || []) if (isSub(p)) ids.push(p.id);
     if (!j.players || j.players.length < 300) break;
   }
@@ -89,7 +91,7 @@ catch (e) {
 }
 
 const now = new Set(ids.map(hash));
-await save({ ids: [...now], checkedAt: new Date().toISOString() });
+await save({ v: STATE_VERSION, ids: [...now], checkedAt: new Date().toISOString() });
 if (!prev) { console.log(`First check: ${now.size} subscribers. Nothing to report yet.`); process.exit(0); }
 
 const before = new Set(prev.ids);
