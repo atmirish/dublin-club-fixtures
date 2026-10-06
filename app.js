@@ -110,9 +110,8 @@ const OS_APP='a9b7cfcb-32ce-447b-8bfb-a65e54a73e0a';
 const BASE=location.pathname.replace(/[^/]*$/,'')||'/';
 const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const isStandalone=()=>{try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}catch(_){return false}};
-// Hidden for everyone for now. Shown only when the page is opened with ?alerts=1
-// (remembered on that device; ?alerts=0 hides it again) or opened from the Home Screen.
-const ALERTS_ON=(()=>{try{const m=/[?&]alerts=([01])/.exec(location.search);if(m)localStorage.setItem('bsjAlerts',m[1]);return localStorage.getItem('bsjAlerts')==='1'||isStandalone()}catch(_){return isStandalone()}})();
+// Result alerts are on for everyone. ?alerts=0 hides them on a device (remembered); ?alerts=1 shows them again.
+const ALERTS_ON=(()=>{try{const m=/[?&]alerts=([01])/.exec(location.search);if(m)localStorage.setItem('bsjAlerts',m[1]);return localStorage.getItem('bsjAlerts')!=='0'}catch(_){return true}})();
 // OneSignal is only loaded when someone taps "Get result alerts", or on later visits
 // from a device that already turned alerts on (remembered on that device).
 const OPT='cfAlertsOptIn';
