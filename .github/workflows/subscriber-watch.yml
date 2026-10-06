@@ -1,0 +1,44 @@
+name: Subscriber watch
+
+# Every hour, sends a push to the approver's devices (role=preview) when people
+# sign up for, or turn off, result alerts. Separate from "Update fixtures".
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: subscriber-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      # The last known list of (hashed) subscription IDs
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .watch/state.json
+          key: subscribers-${{ github.run_id }}
+          restore-keys: subscribers-
+      - name: Check for new sign-ups and unsubscribes
+        env:
+          ONESIGNAL_API_KEY: ${{ secrets.ONESIGNAL_API_KEY }}
+          ONESIGNAL_APP_ID: a9b7cfcb-32ce-447b-8bfb-a65e54a73e0a
+          SITE_URL: https://atmirish.github.io/dublin-club-fixtures/
+        run: node scripts/watch-subscribers.mjs .watch/state.json
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: hashFiles('.watch/state.json') != ''
+        with:
+          path: .watch/state.json
+          key: subscribers-${{ github.run_id }}
