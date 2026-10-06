@@ -35,7 +35,11 @@ async function api(url, opts = {}) {
 }
 
 // A subscription counts if it can still receive pushes
-const isSub = s => !Number(s.invalid_identifier) && String(s.invalid_identifier) !== 'true' && Number(s.notification_types) > 0;
+const isSub = s => {
+  if (['t', 'true', '1'].includes(String(s.invalid_identifier).toLowerCase())) return false;
+  const nt = s.notification_types; // not in every export; when present, 0 or less means unsubscribed
+  return nt == null || nt === '' || Number(nt) > 0;
+};
 
 async function viaList() {
   const ids = [];
@@ -43,7 +47,6 @@ async function viaList() {
     const res = await api(`https://api.onesignal.com/players?app_id=${APP}&limit=300&offset=${offset}`);
     if (!res.ok) throw new Error(`list ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const j = await res.json();
-    if (!offset) console.log(`List API: total_count=${j.total_count}, returned=${(j.players || []).length}, fields=${JSON.stringify((j.players || []).map(p => [p.device_type, p.invalid_identifier, p.notification_types]))}`);
     for (const p of j.players || []) if (isSub(p)) ids.push(p.id);
     if (!j.players || j.players.length < 300) break;
   }
@@ -77,7 +80,6 @@ async function viaExport() {
     const [head, ...rows] = parseCsv(text).filter(r => r.length > 1);
     const col = n => head.indexOf(n);
     const id = col('id'), it = col('invalid_identifier'), nt = col('notification_types');
-    console.log(`Export: ${rows.length} rows; columns ${head.join(', ')}; status ${JSON.stringify(rows.map(r => [r[col('device_type')], r[it], r[nt]]))}`);
     return rows.map(r => ({ id: r[id], invalid_identifier: r[it], notification_types: r[nt] })).filter(isSub).map(r => r.id);
   }
   throw new Error('export file was not ready in time');
