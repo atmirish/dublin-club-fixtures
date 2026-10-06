@@ -77,17 +77,17 @@ async function viaExport() {
     const [head, ...rows] = parseCsv(text).filter(r => r.length > 1);
     const col = n => head.indexOf(n);
     const id = col('id'), it = col('invalid_identifier'), nt = col('notification_types');
+    console.log(`Export: ${rows.length} rows; columns ${head.join(', ')}; status ${JSON.stringify(rows.map(r => [r[col('device_type')], r[it], r[nt]]))}`);
     return rows.map(r => ({ id: r[id], invalid_identifier: r[it], notification_types: r[nt] })).filter(isSub).map(r => r.id);
   }
   throw new Error('export file was not ready in time');
 }
 
+// The CSV export covers every subscription; the old list API can miss newer ones.
 let ids;
-try { ids = await viaList(); console.log('Read subscribers from the list API.'); }
+try { ids = await viaExport(); console.log('Read subscribers from the CSV export.'); }
 catch (e) {
-  console.log(`List API unavailable (${e.message}); using CSV export.`);
-  try { ids = await viaExport(); }
-  catch (e2) { console.log(`Could not read subscribers: ${e2.message}`); if (prev) await save(prev); process.exit(0); }
+  console.log(`Could not read subscribers: ${e.message}`); if (prev) await save(prev); process.exit(0);
 }
 
 const now = new Set(ids.map(hash));
