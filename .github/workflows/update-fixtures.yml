@@ -4,10 +4,10 @@ name: Update fixtures
 # Settings > Pages > Source must be set to "GitHub Actions".
 on:
   schedule:
-    # Target: 08:00, 12:00, 16:00 and 20:00 Irish time. GitHub schedules run in UTC,
-    # so this fires at both possible UTC hours and the "check" job skips the one
-    # that doesn't match the current Irish time (summer or winter).
-    - cron: '7 7,8,11,12,15,16,19,20 * * *'
+    # Target (Irish time): weekdays every two hours 11:00-23:00; weekends every hour 10:00-22:00.
+    # GitHub schedules run in UTC, so this fires every hour from 09:00 to 23:00 UTC and the
+    # "check" job skips the runs that don't match the current Irish time (summer or winter).
+    - cron: '7 9-23 * * *'
   push:
     branches: [main]
   workflow_dispatch:
@@ -30,10 +30,13 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
         run: |
-          h=$(TZ=Europe/Dublin date +%H)
-          echo "Irish time hour: $h"
-          if [ "$EVENT" != "schedule" ]; then echo "run=true" >> "$GITHUB_OUTPUT"
-          else case "$h" in 08|12|16|20) echo "run=true" >> "$GITHUB_OUTPUT";; *) echo "run=false" >> "$GITHUB_OUTPUT";; esac; fi
+          h=$(TZ=Europe/Dublin date +%H); d=$(TZ=Europe/Dublin date +%u)
+          echo "Irish time: day $d, hour $h"
+          run=false
+          if [ "$EVENT" != "schedule" ]; then run=true
+          elif [ "$d" -ge 6 ]; then case "$h" in 1[0-9]|2[0-2]) run=true;; esac
+          else case "$h" in 11|13|15|17|19|21|23) run=true;; esac; fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
 
   deploy:
     needs: check
