@@ -10,6 +10,7 @@
 //   - a BSJ game is in its "result could appear now" window AND the Dublin feeds show
 //     something has changed (a score, time, venue, status or a new/removed fixture)
 // Result windows, measured from throw-in:  45 min - 3 h: every check;  3 h - 8 h: every 20 min.
+// U8-U11 games are ignored: their scores are almost never entered (none in Oct-Nov 2026).
 import { readFile, appendFile, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -19,6 +20,7 @@ const SITE = process.env.SITE_URL || 'https://atmirish.github.io/dublin-club-fix
 const TZ = 'Europe/Dublin';
 const REFRESH_HOURS = 3;
 const SWEEP_HOUR = 7;
+const MIN_RESULT_AGE = 12; // youngest grade whose results get entered
 
 const parts = d => Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
   timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', weekday: 'short', hourCycle: 'h23'
@@ -62,6 +64,8 @@ const hasScore = r => /\d/.test(r[12] || '') && /\d/.test(r[13] || '');
 const everyCheck = [], every20 = [];
 for (const r of live.fx) {
   if (r[1] !== today || r[11] === 'Postponed' || hasScore(r)) continue;
+  const age = /^U(\d{1,2})$/i.exec(r[4] || '');
+  if (age && Number(age[1]) < MIN_RESULT_AGE) continue;
   const start = toMin(r[2]);
   const label = `${r[2] || 'time TBC'} ${r[6]} v ${r[7]}`;
   if (start == null) { if (nowMin >= 11 * 60 && nowMin <= 21 * 60) every20.push(label); continue; }
