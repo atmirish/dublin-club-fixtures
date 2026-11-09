@@ -1,41 +1,34 @@
-// Result alerts via OneSignal, with approval before anything goes to everyone.
+// Result alerts via OneSignal, sent straight to every subscriber (no approval step).
 //
-//   node scripts/notify-results.mjs prepare <new fixtures.json> <previous fixtures.json>
-//     Finds BSJ results that weren't on the live site before this run, sends a PREVIEW
-//     only to devices tagged role=preview, and writes the alert to $GITHUB_OUTPUT as "alert".
+//   node scripts/notify-results.mjs <new fixtures.json> <previous fixtures.json>
+//     Finds BSJ results that weren't on the live site before this run and sends one alert
+//     to everyone. If the send fails, the step fails (red in GitHub, and GitHub emails you).
 //
-//   node scripts/notify-results.mjs send
-//     Sends the approved alert (from the ALERT env var) to all subscribers.
-//     Runs in the "result-alerts" environment, which needs a reviewer to approve it.
-//
-//   node scripts/notify-results.mjs auto
-//     Waits AUTO_SEND_MINUTES (30). If nobody approved or rejected the alert in that time,
-//     sends it anyway and cancels the waiting approval. Approve = send now, Reject = never send.
-//     The same OneSignal idempotency key is used by both jobs, so an alert is never sent twice.
+// Manual test (Actions > Update fixtures > Run workflow > "Send a test alert"):
+// sends a made-up result only to devices tagged role=preview (5 taps on the site's header icon).
 //
 // Needs ONESIGNAL_API_KEY (GitHub secret). Without it, or without the previous file, it does nothing.
-import { readFile, appendFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 
-const [, , mode, newPath, prevPath] = process.argv;
+const [, , newPath, prevPath] = process.argv;
 const KEY = process.env.ONESIGNAL_API_KEY;
 const APP = process.env.ONESIGNAL_APP_ID;
 const SITE = process.env.SITE_URL;
 const ICON = new URL('icon-192.png', SITE || 'https://atmirish.github.io/dublin-club-fixtures/').href;
-const MAX_AGE_HOURS = 3; // an approval later than this is too late; the alert is skipped
-const AUTO_SEND_MINUTES = Number(process.env.AUTO_SEND_MINUTES) || 30; // no decision by then = send automatically
 
 if (!KEY || !APP) { console.log('No OneSignal key set; skipping result alerts.'); process.exit(0); }
 const PREVIEW = { filters: [{ field: 'tag', key: 'role', relation: '=', value: 'preview' }] };
+const EVERYONE = { included_segments: ['Total Subscriptions'] };
 
 // New OneSignal keys (os_v2_...) use "Key", older REST API keys use "Basic"; try the likely one first.
 const SCHEMES = KEY.startsWith('os_v2_') ? ['Key', 'Basic'] : ['Basic', 'Key'];
-// One key per workflow run, shaped as a UUID v4: OneSignal ignores a repeat with the same key
+// One key per workflow run, shaped as a UUID v4: if a run is re-run, OneSignal won't send it twice
 function idempotencyKey() {
   const h = createHash('sha256').update(`result-alert-${process.env.GITHUB_RUN_ID || Date.now()}`).digest('hex');
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-${'89ab'[parseInt(h[16], 16) % 4]}${h.slice(17, 20)}-${h.slice(20, 32)}`;
 }
-async function push(target, heading, contents, once = false) {
+async function push(target, heading, contents) {
   let res, text;
   for (const scheme of SCHEMES) {
     res = await fetch('https://api.onesignal.com/notifications?c=push', {
@@ -44,8 +37,7 @@ async function push(target, heading, contents, once = false) {
       body: JSON.stringify({
         app_id: APP, target_channel: 'push', ...target,
         headings: { en: heading }, contents: { en: contents }, url: SITE,
-        chrome_web_icon: ICON, firefox_icon: ICON,
-        ...(once ? { idempotency_key: idempotencyKey() } : {})
+        chrome_web_icon: ICON, firefox_icon: ICON, idempotency_key: idempotencyKey()
       }),
       signal: AbortSignal.timeout(30000)
     });
@@ -53,70 +45,25 @@ async function push(target, heading, contents, once = false) {
     if (res.status !== 401 && res.status !== 403) break;
   }
   console.log(`OneSignal replied ${res.status}: ${text}`);
-  return { ok: res.ok, text };
+  // OneSignal can answer 200 and still send nothing: it then gives no message id, or lists errors
+  let j = {};
+  try { j = JSON.parse(text); } catch {}
+  const errors = Array.isArray(j.errors) ? j.errors : j.errors ? Object.values(j.errors) : [];
+  return { ok: res.ok && !!j.id && !errors.length, text };
+}
+async function send(target, heading, contents, who) {
+  console.log(`Sending to ${who}:\n${heading}\n${contents}`);
+  let r = await push(target, heading, contents);
+  // Older OneSignal apps call the all-subscribers segment "Subscribed Users"
+  if (!r.ok && target === EVERYONE && /segment/i.test(r.text)) r = await push({ included_segments: ['Subscribed Users'] }, heading, contents);
+  if (r.ok) { console.log('Sent.'); return; }
+  console.log('::error title=Result alert not sent::OneSignal did not send the alert. See the reply above.');
+  process.exit(1);
 }
 
-async function sendAlert() {
-  let alert;
-  try { alert = JSON.parse(Buffer.from(process.env.ALERT || '', 'base64').toString('utf8')); }
-  catch { console.log('No alert to send.'); return true; }
-  const ageH = (Date.now() - new Date(alert.createdAt).getTime()) / 36e5;
-  if (!(ageH <= MAX_AGE_HOURS)) { console.log(`Approved ${ageH.toFixed(1)} hours after the results came in; too late, not sending.`); return true; }
-  if (alert.test) {
-    console.log(`Test alert; sending to preview devices only:\n${alert.heading}\n${alert.contents}`);
-    return (await push(PREVIEW, alert.heading, alert.contents, true)).ok;
-  }
-  console.log(`Sending to everyone:\n${alert.heading}\n${alert.contents}`);
-  let r = await push({ included_segments: ['Total Subscriptions'] }, alert.heading, alert.contents, true);
-  if (!r.ok && /segment/i.test(r.text)) r = await push({ included_segments: ['Subscribed Users'] }, alert.heading, alert.contents, true);
-  return r.ok;
-}
-
-if (mode === 'send') {
-  if (!(await sendAlert())) process.exitCode = 1;
-  process.exit();
-}
-
-if (mode === 'auto') {
-  const run = `${process.env.GITHUB_API_URL}/repos/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
-  const gh = (path, opts = {}) => fetch(run + path, { ...opts, headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${process.env.GH_TOKEN}` }, signal: AbortSignal.timeout(30000) });
-  const deadline = Date.now() + AUTO_SEND_MINUTES * 60e3;
-  let decision = null;
-  while (!decision && Date.now() < deadline) {
-    try {
-      const r = await gh('/approvals');
-      if (r.ok) decision = (await r.json()).find(a => (a.environments || []).some(e => e.name === 'result-alerts'))?.state || null;
-    } catch {}
-    if (!decision) await new Promise(r => setTimeout(r, 60e3));
-  }
-  if (decision === 'rejected') { console.log('Rejected in GitHub; not sending.'); process.exit(0); }
-  if (decision === 'approved') { console.log('Approved in GitHub; the send-alert job sends it.'); process.exit(0); }
-  console.log(`No decision after ${AUTO_SEND_MINUTES} minutes; sending automatically.`);
-  const ok = await sendAlert();
-  // Clear the approval that's still waiting (this also stops this job, so it comes last)
-  console.log('Cancelling the waiting approval, as the alert has been sent.');
-  await gh('/cancel', { method: 'POST' }).catch(() => {});
-  if (!ok) process.exitCode = 1;
-  process.exit();
-}
-
-if (mode !== 'prepare') { console.log('Usage: notify-results.mjs prepare <new> <previous> | send | auto'); process.exit(1); }
-
-async function queue(alert, count = 1) {
-  console.log(`Alert waiting for approval:\n${alert.heading}\n${alert.contents}`);
-  if (process.env.GITHUB_OUTPUT) {
-    await appendFile(process.env.GITHUB_OUTPUT, `alert=${Buffer.from(JSON.stringify(alert)).toString('base64')}\n`);
-  }
-  // Preview to the approver's devices only
-  const warn = count > 15 ? `\n⚠ ${count} results at once – check the feed looks right.` : '';
-  await push(PREVIEW, `Preview: ${alert.heading}`, `${alert.contents}${warn}\nSends to everyone in ${AUTO_SEND_MINUTES} min. Approve in GitHub to send now, or reject to stop it.`);
-}
-
-// Manual test (Actions > Update fixtures > Run workflow > "Send a test alert"):
-// goes through preview and approval, but is only ever sent to preview devices.
 if (process.env.TEST_ALERT === 'true') {
-  await queue({ heading: 'TEST: BSJ result', contents: 'U12 Football (A): Won 2-10 v 1-08 Test Club\nThis is a test of the approval step.', createdAt: new Date().toISOString(), test: true });
-  process.exit();
+  await send(PREVIEW, 'TEST: BSJ result', 'U12 Football (A): Won 2-10 v 1-08 Test Club\nThis is a test alert.', 'preview devices only (test)');
+  process.exit(0);
 }
 
 let prev;
@@ -152,4 +99,4 @@ const lines = fresh.map(r => {
 const heading = fresh.length === 1 ? 'BSJ result' : `${fresh.length} new BSJ results`;
 const MAX = 6;
 const contents = lines.slice(0, MAX).join('\n') + (lines.length > MAX ? `\n+${lines.length - MAX} more on the site` : '');
-await queue({ heading, contents, createdAt: new Date().toISOString() }, fresh.length);
+await send(EVERYONE, heading, contents, 'everyone');
