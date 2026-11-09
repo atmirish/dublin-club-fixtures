@@ -3,15 +3,20 @@ name: Update fixtures
 # Builds the site with this week's fixtures and publishes it to GitHub Pages.
 # Settings > Pages > Source must be set to "GitHub Actions".
 on:
+  # Main trigger: cron-job.org starts this every 5 minutes (07:00-23:00 Irish time) with
+  # mode "smart". GitHub's own hourly schedule is only a backup (it often runs late or not at all).
+  # In smart mode the "check" job decides whether a full update is worth it (scripts/should-update.mjs).
   schedule:
-    # Target (Irish time): weekdays every two hours 11:00-23:00; weekends every hour 10:00-22:00.
-    # GitHub schedules run in UTC, so this fires every hour from 06:00 to 23:00 UTC and the
-    # "check" job skips the runs that don't match the current Irish time (summer or winter).
     - cron: '7 6-23 * * *'
   push:
     branches: [main]
   workflow_dispatch:
     inputs:
+      mode:
+        description: full = always update; smart = only if something may have changed
+        type: choice
+        options: [full, smart]
+        default: full
       test_alert:
         description: Send a test alert (only goes to preview devices)
         type: boolean
@@ -23,21 +28,29 @@ permissions: {}
 jobs:
   check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
-      run: ${{ steps.hour.outputs.run }}
+      run: ${{ steps.full.outputs.run || steps.smart.outputs.run }}
     steps:
-      - id: hour
+      # Pushes, the Run workflow button (mode "full") and test alerts always update
+      - id: full
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (inputs.mode != 'smart' || inputs.test_alert))
+        run: echo "run=true" >> "$GITHUB_OUTPUT"
+      - if: steps.full.outputs.run != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - if: steps.full.outputs.run != 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - id: smart
+        name: Quick check
+        if: steps.full.outputs.run != 'true'
         env:
-          EVENT: ${{ github.event_name }}
-        run: |
-          h=$(TZ=Europe/Dublin date +%H); d=$(TZ=Europe/Dublin date +%u)
-          echo "Irish time: day $d, hour $h"
-          run=false
-          if [ "$EVENT" != "schedule" ]; then run=true
-          elif [ "$d" = 1 ] && [ "$h" = 07 ]; then run=true
-          elif [ "$d" -ge 6 ]; then case "$h" in 1[0-9]|2[0-2]) run=true;; esac
-          else case "$h" in 11|13|15|17|19|21|23) run=true;; esac; fi
-          echo "run=$run" >> "$GITHUB_OUTPUT"
+          SITE_URL: https://atmirish.github.io/dublin-club-fixtures/
+        run: node scripts/should-update.mjs
 
   deploy:
     needs: check
